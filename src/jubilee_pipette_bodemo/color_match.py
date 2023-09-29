@@ -1,6 +1,9 @@
 import numpy as np
 import image_processing as img
-from bayesopt import bayesian_optimzer, acquisitions
+
+import bayesopt.bayesian_optimizer as bayesian_optimizer
+import bayesopt.model as model
+
 import jubilee_protocols
 
 
@@ -8,7 +11,7 @@ import jubilee_protocols
 This module should handle the bayesian optimization loop type stuff
 """
 
-def BO_campaign(initial_data, acquisition_function, number_of_iterations, jubilee, pipette, camera, sample_volume, red_stock, yellow_stock, blue_stock, samples):
+def BO_campaign(initial_data, acquisition_function, number_of_iterations, jubilee, pipette, camera, sample_volume, red_stock, yellow_stock, blue_stock, samples, trash_well):
     """
     This should be a child-safed way to run BO on the platform
 
@@ -46,7 +49,7 @@ def BO_campaign(initial_data, acquisition_function, number_of_iterations, jubile
         # run point in real world
         print(f'Dispensing into well {well}')
         print('RYB values tested: {query_point}')
-        new_color = jubilee_protocols.sample_point(jubilee, pipette, camera, query_point, sample_volume, well, red_stock, yellow_stock, blue_stock)
+        new_color = jubilee_protocols.sample_point(jubilee, pipette, camera, query_point, sample_volume, well, red_stock, yellow_stock, blue_stock, trash_well)
 
         print('RGB values observed: {RGB}')
         query_point = bo.campaign_iteration(query_point, new_color)
