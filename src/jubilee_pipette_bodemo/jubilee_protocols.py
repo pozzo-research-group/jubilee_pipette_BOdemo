@@ -29,6 +29,8 @@ def sample_point(jubilee, pipette, Camera, RYB: tuple, volume: float, well, red_
     ########
     # Volume calculation code
     #################
+
+    print('Start of sample sequence position: ', jubilee.get_position())
     RYB = list(RYB)
     # get the volumes of each color
     if np.isclose(sum(RYB), 1):
@@ -39,6 +41,8 @@ def sample_point(jubilee, pipette, Camera, RYB: tuple, volume: float, well, red_
         raise AssertionError('Error: Volume fractions of RYB must add to 1 or 255')
     
     volumes = [vf*volume for vf in RYB]    
+
+    print('Calculated volumes: ', volumes)
     
 
     ###############
@@ -49,92 +53,97 @@ def sample_point(jubilee, pipette, Camera, RYB: tuple, volume: float, well, red_
     # pipette red:
     #pickup the red tip from rack
     jubilee.pickup_tool(pipette)
+    #dirty check to make sure we are clearing z. need to fix whatever bug is causing this issue
+    jubilee.move_to(z = 100)
+
+    #print('Pipette picked up: ', jubilee.get_position()['Z'])
+    #print('Tool offsets: ', jubilee.tool_z_offsets)
+
     #this is a mess to make sure we aren't pipetting more than 300 ul. Fix in transfer function
 
+    #print('red tip: ', red_tip)
+    try:
+        red_tip = pipette.red_tip
+    except AttributeError:
+        pipette.red_tip = pipette.first_available_tip
+        red_tip = pipette.red_tip
+        pipette.increment_tip()
+
+    pipette.pickup_tip(red_tip)
+
+    #print('Offsets after picking up tip: ')
+    #print('Tool offsets: ', jubilee.tool_z_offsets)
+        
+    #print(f'Dispensing {volumes[0]} of red')
+    #print('red tip: ', red_tip)
     if volumes[0] > 300:
-        try:
-            red_tip = pipette.red_tip
-        except AttributeError:
-            red_tip = None
-
-        pipette.pickup_tip(red_tip)
-
-        if red_tip is None:
-            pipette.red_tip = pipette.first_available_tip
-        #aspirate v[0] of red solution
-        pipette.transfer(volumes[0]/2, red_stock, well)
-        pipette.transfer(volumes[0]/2, red_stock, well)
-        # return tip to same location
-        pipette.return_tip()
+        pipette.transfer(volumes[0]/2, red_stock, well, blowout = True)
+        pipette.transfer(volumes[0]/2, red_stock, well, blowout = True)
     else:
-        try:
-            red_tip = pipette.red_tip
-        except AttributeError:
-            red_tip = None
+        pipette.transfer(volumes[0], red_stock, well, blowout = True)
+    # return tip to same location
+    pipette.return_tip(location = red_tip)
 
-        pipette.pickup_tip(red_tip)
-
-        if red_tip is None:
-            pipette.red_tip = pipette.first_available_tip
-        #aspirate v[0] of red solution
-        pipette.transfer(volumes[0], red_stock, well)
-        # return tip to same location
-        pipette.return_tip()
+    #print('Offsets after returning tip: ', jubilee.tool_z_offsets)
 
     # same for yellow
+    
+    try:
+        yellow_tip = pipette.yellow_tip
+    except AttributeError:
+        pipette.yellow_tip = pipette.first_available_tip
+        yellow_tip = pipette.yellow_tip
+        pipette.increment_tip()
+
+    #print(f'Dispensing {volumes[1]} of yellow')
+    pipette.pickup_tip(yellow_tip)
     if volumes[1] > 300:
-        try:
-            yellow_tip = pipette.yellow_tip
-        except AttributeError:
-            yellow_tip = None
-
-        pipette.pickup_tip(yellow_tip)
-
-        if yellow_tip is None:
-            pipette.yellow_tip = pipette.first_available_tip
-
-        pipette.transfer(volumes[1]/2, yellow_stock, well)
-        pipette.transfer(volumes[1]/2, yellow_stock, well)
-        # return tip to same location
-        pipette.return_tip()
+        pipette.transfer(volumes[1]/2, yellow_stock, well, blowout = True)
+        pipette.transfer(volumes[1]/2, yellow_stock, well, blowout = True)
     else:
-        try:
-            yellow_tip = pipette.yellow_tip
-        except AttributeError:
-            yellow_tip = None
-
-        pipette.pickup_tip(yellow_tip)
-
-        if yellow_tip is None:
-            pipette.yellow_tip = pipette.first_available_tip
-
-        pipette.transfer(volumes[1], yellow_stock, well)
+        pipette.transfer(volumes[1], yellow_stock, well, blowout = True)
         # return tip to same location
-        pipette.return_tip()
+    pipette.return_tip(location = yellow_tip)
 
     # for blue:
     # get a new tip
+    #print('Next tip: ', pipette.first_available_tip)
+    pipette.pickup_tip()
+
+    #print(f'Dispensing {volumes[2]} of blue')
     if volumes[2] > 300:
-        pipette.pickup_tip()
-        # aspirate, dispense
-        pipette.transfer(volumes[2]/2, blue_stock, well)
-        pipette.transfer(volumes[2]/2, blue_stock, well, mix_after = (300, 3))
+        pipette.transfer(volumes[2]/2, blue_stock, well, blowout = True)
+        pipette.transfer(volumes[2]/2, blue_stock, well, mix_after = (275, 5), blowout = True)
         # discard tip 
-        pipette.drop_tip(trash_well)
     else:
-        pipette.pickup_tip()
-        # aspirate, dispense
-        pipette.transfer(volumes[2], blue_stock, well, mix_after = (300, 3))
+        pipette.transfer(volumes[2], blue_stock, well, mix_after = (275, 5), blowout = True)
         # discard tip 
-        pipette.drop_tip(trash_well)
+    pipette.drop_tip(trash_well)
+    
+    #pipette.pickup_tip()
+    #print('Offsets with tip: ', jubilee.tool_z_offsets)
+    #pipette.drop_tip(trash_well)
+    #print('offsets after dropping tip: ', jubilee.tool_z_offsets)
 
 
-    jubilee.park_tool(pipette)
+
+
+    #print('About to park pipette: ', jubilee.get_position()['Z'])
+    jubilee.park_tool()
+    #print('just parked pipette: ', jubilee.get_position()['Z'])
+    #print('Tool offsets: ', jubilee.tool_z_offsets)
     
     # will this park the tool automatically?
     jubilee.pickup_tool(Camera)
-    image = jubilee.well_image(well)
+    #print('Just picked up camera: ', jubilee.get_position()['Z'])
     image = Camera.capture_image(well)
+    #Camera.view_image(image, masked = True)
+    #print('About to drop bed :', jubilee.get_position()['Z'])
+    #jubilee.move(dz = 50)
+
+    jubilee.park_tool()
+    #print('just parked camera: ', jubilee.get_position()['Z'])
+    #print('Tool offsets :', jubilee.tool_z_offsets)
     # do post-processing 
     RGB = img.process_image(image)
     
