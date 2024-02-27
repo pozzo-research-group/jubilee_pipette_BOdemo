@@ -30,7 +30,7 @@ def sample_point(jubilee, pipette, Camera, RYB: tuple, volume: float, well, red_
     # Volume calculation code
     #################
 
-    print('Start of sample sequence position: ', jubilee.get_position())
+    #print('Start of sample sequence position: ', jubilee.get_position())
     RYB = list(RYB)
     # get the volumes of each color
     if np.isclose(sum(RYB), 1):
@@ -69,21 +69,23 @@ def sample_point(jubilee, pipette, Camera, RYB: tuple, volume: float, well, red_
         red_tip = pipette.red_tip
         pipette.increment_tip()
 
-    pipette.pickup_tip(red_tip)
+    if volumes[0] > 0:
+        pipette.pickup_tip(red_tip)
 
-    #print('Offsets after picking up tip: ')
-    #print('Tool offsets: ', jubilee.tool_z_offsets)
-        
-    #print(f'Dispensing {volumes[0]} of red')
-    #print('red tip: ', red_tip)
-    if volumes[0] > 300:
-        pipette.transfer(volumes[0]/2, red_stock, well, blowout = True)
-        pipette.transfer(volumes[0]/2, red_stock, well, blowout = True)
+        #print('Offsets after picking up tip: ')
+        #print('Tool offsets: ', jubilee.tool_z_offsets)
+            
+        #print(f'Dispensing {volumes[0]} of red')
+        #print('red tip: ', red_tip)
+        if volumes[0] > 300:
+            pipette.transfer(volumes[0]/2, red_stock, well, blowout = True)
+            pipette.transfer(volumes[0]/2, red_stock, well, blowout = True)
+        else:
+            pipette.transfer(volumes[0], red_stock, well, blowout = True)
+        # return tip to same location
+        pipette.return_tip(location = red_tip)
     else:
-        pipette.transfer(volumes[0], red_stock, well, blowout = True)
-    # return tip to same location
-    pipette.return_tip(location = red_tip)
-
+        pass
     #print('Offsets after returning tip: ', jubilee.tool_z_offsets)
 
     # same for yellow
@@ -95,30 +97,37 @@ def sample_point(jubilee, pipette, Camera, RYB: tuple, volume: float, well, red_
         yellow_tip = pipette.yellow_tip
         pipette.increment_tip()
 
-    #print(f'Dispensing {volumes[1]} of yellow')
-    pipette.pickup_tip(yellow_tip)
-    if volumes[1] > 300:
-        pipette.transfer(volumes[1]/2, yellow_stock, well, blowout = True)
-        pipette.transfer(volumes[1]/2, yellow_stock, well, blowout = True)
+    if volumes[1] > 0:
+        #print(f'Dispensing {volumes[1]} of yellow')
+        pipette.pickup_tip(yellow_tip)
+        if volumes[1] > 300:
+            pipette.transfer(volumes[1]/2, yellow_stock, well, blowout = True)
+            pipette.transfer(volumes[1]/2, yellow_stock, well, blowout = True)
+        else:
+            pipette.transfer(volumes[1], yellow_stock, well, blowout = True)
+            # return tip to same location
+        pipette.return_tip(location = yellow_tip)
+    
     else:
-        pipette.transfer(volumes[1], yellow_stock, well, blowout = True)
-        # return tip to same location
-    pipette.return_tip(location = yellow_tip)
+        pass
 
     # for blue:
     # get a new tip
     #print('Next tip: ', pipette.first_available_tip)
-    pipette.pickup_tip()
+    if volumes[2] > 0:
+        pipette.pickup_tip()
 
-    #print(f'Dispensing {volumes[2]} of blue')
-    if volumes[2] > 300:
-        pipette.transfer(volumes[2]/2, blue_stock, well, blowout = True)
-        pipette.transfer(volumes[2]/2, blue_stock, well, mix_after = (275, 5), blowout = True)
-        # discard tip 
+        #print(f'Dispensing {volumes[2]} of blue')
+        if volumes[2] > 300:
+            pipette.transfer(volumes[2]/2, blue_stock, well, blowout = True)
+            pipette.transfer(volumes[2]/2, blue_stock, well, mix_after = (275, 5), blowout = True)
+            # discard tip 
+        else:
+            pipette.transfer(volumes[2], blue_stock, well, mix_after = (275, 5), blowout = True)
+            # discard tip 
+        pipette.drop_tip(trash_well)
     else:
-        pipette.transfer(volumes[2], blue_stock, well, mix_after = (275, 5), blowout = True)
-        # discard tip 
-    pipette.drop_tip(trash_well)
+        pass
     
     #pipette.pickup_tip()
     #print('Offsets with tip: ', jubilee.tool_z_offsets)
@@ -147,4 +156,4 @@ def sample_point(jubilee, pipette, Camera, RYB: tuple, volume: float, well, red_
     # do post-processing 
     RGB = img.process_image(image)
     
-    return RGB
+    return RGB, image

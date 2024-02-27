@@ -4,14 +4,20 @@ import image_processing as img
 import bayesopt.bayesian_optimizer as bayesian_optimizer
 import bayesopt.model as model
 
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process import kernels
+
 import jubilee_protocols
 
+import matplotlib.pyplot as plt
+
+import cv2
 
 """
 This module should handle the bayesian optimization loop type stuff
 """
 
-def BO_campaign(initial_data, acquisition_function, number_of_iterations, jubilee, pipette, camera, sample_volume, red_stock, yellow_stock, blue_stock, samples, trash_well):
+def BO_campaign(initial_data, acquisition_function, acq_kwargs, number_of_iterations, target_color, jubilee, pipette, camera, sample_volume, red_stock, yellow_stock, blue_stock, samples, trash_well, start_well = 0):
     """
     This should be a child-safed way to run BO on the platform
 
@@ -31,13 +37,31 @@ def BO_campaign(initial_data, acquisition_function, number_of_iterations, jubile
     available_points = get_constrained_points(n_points)
     # we know we are working with a 3-variable constrained design space here so can just hard-code that
     # instantiate a bayesian optimizer object
-    bo = bayesian_optimzer.BayesianOptimizer(None, acquisition_function, None, initial_data)
+    kernel = kernels.Matern(nu = 1/2)
+    internal_model = model.GaussianProcessModel(kernel, scale = True, alpha = 1e-5)
+
+    bo = bayesian_optimizer.BayesianOptimizer(None, acquisition_function, internal_model, initial_data, valid_points = available_points, acq_kwargs = acq_kwargs)
 
     # check that we have enough sample wells for the number of iterations we want to run 
-    assert len(samples.wells < number_of_iterations), 'Error: Too many samples to test for number of wells in labware.'
+
+    assert len(samples.wells) > number_of_iterations, 'Error: Too many samples to test for number of wells in labware.'
 
     # get first set of points from model
-    query_point = bo.campaign_iteration(None, None)
+    query_point = bo.campaign_iteration(None, None)[0]
+
+    rgb_values_sampled = []
+    ryb_points_sampled = []
+    images = []
+    scores = []
+
+
+    plt.ion()
+    fig, ax = plt.subplots(1,2, figsize = (20,8))
+
+    ax[0].set_title('Most Recent Image')
+    ax[1].set_title('Color Loss Plot')
+    ax[1].set_xlabel('Iteration')
+    ax[1].set_ylabel('Loss')
 
     for i in range(number_of_iterations):
         # query point from BO model
@@ -45,16 +69,52 @@ def BO_campaign(initial_data, acquisition_function, number_of_iterations, jubile
         print(f'Starting iteration {i}')
 
         # figure out how to get the next well with the new setup
-        well = samples[i]
+        well = samples[i+start_well]
         # run point in real world
         print(f'Dispensing into well {well}')
-        print('RYB values tested: {query_point}')
-        new_color = jubilee_protocols.sample_point(jubilee, pipette, camera, query_point, sample_volume, well, red_stock, yellow_stock, blue_stock, trash_well)
+        print(f'RYB values tested: {query_point}')
+        new_RGB, image = jubilee_protocols.sample_point(jubilee, pipette, camera, query_point, sample_volume, well, red_stock, yellow_stock, blue_stock, trash_well)
 
+        images.append(image)
+        new_color = normalize_color(new_RGB)
+
+
+        ryb_points_sampled.append(query_point)
+        rgb_values_sampled.append(new_RGB)
+        score = color_loss_calculation(target_color, new_color)
+        scores.append(score)
         print('RGB values observed: {RGB}')
-        query_point = bo.campaign_iteration(query_point, new_color)
+        query_point = bo.campaign_iteration(query_point, score)[0]
 
+        try:
+            plot_results(rgb_values_sampled, target_color, image, fig, ax)
+        except Exception as e:
+            print(e)
+            pass
 
+    return ryb_points_sampled, rgb_values_sampled, score, bo
+
+def plot_results(rgb_values_sampled, target_color, image, fig, ax):
+    # get loss values
+    loss_vals = [color_loss_calculation(target_color, normalize_color(rgb)) for rgb in rgb_values_sampled]
+    norm_colors = [normalize_color(rgb) for rgb in rgb_values_sampled]
+    # plot iteration vs. loss with color observed as marker color
+
+    
+
+    imgbuf = np.frombuffer(image, dtype = np.uint8)
+    imgcv = cv2.imdecode(imgbuf, cv2.IMREAD_COLOR)
+    imgcv_rgb = imgcv[:,:,[2,1,0]]
+
+    for i, loss in enumerate(loss_vals):
+        ax[1].scatter(i, loss_vals[i], marker = 'o', color = norm_colors[i], s = 200)
+        ax[0].imshow(imgcv_rgb)
+
+    fig.canvas.draw()
+
+    fig.canvas.flush_events()
+
+    return
 
 
 def get_constrained_points(n_points):
@@ -83,3 +143,23 @@ def initial_random_sample(testable_points, n_sample = 12):
     selected_points = testable_points[selected_inds, :]
    
     return selected_points
+
+
+def color_loss_calculation(target_color, measured_color):
+    """
+    Get the score for a point
+    """
+    distance = [np.abs(np.array(t) - np.array(m)) for t, m in zip(target_color, measured_color)]
+    score = np.linalg.norm(distance)
+
+    return 1 - score
+
+
+def normalize_color(RYB):
+    """
+    normalize 0-255 or 0-1 to 0-1
+    """
+    RYB = list(RYB)
+    if np.any([v > 1 for v in RYB]):
+        RYB = [i/255 for i in RYB]
+    return RYB
