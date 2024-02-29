@@ -28,11 +28,13 @@ def _mask_image(image, radius):
 
 
 def _get_rgb_avg(image):
-    rgb = []
+    bgr = []
     for dim in [0,1,2]:
         flatdim = image[:,:,dim].flatten()
         indices = flatdim.nonzero()[0]
         value = flatdim.flatten()[indices].mean()
-        rgb.append(value)
+        bgr.append(value)
+
+    rgb = [bgr[i] for i in [2,1,0]]
 
     return rgb

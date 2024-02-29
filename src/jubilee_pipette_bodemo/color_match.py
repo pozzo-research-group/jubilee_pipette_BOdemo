@@ -92,7 +92,7 @@ def BO_campaign(initial_data, acquisition_function, acq_kwargs, number_of_iterat
             print(e)
             pass
 
-    return ryb_points_sampled, rgb_values_sampled, score, bo
+    return ryb_points_sampled, rgb_values_sampled, images, score, bo
 
 def plot_results(rgb_values_sampled, target_color, image, fig, ax):
     # get loss values
