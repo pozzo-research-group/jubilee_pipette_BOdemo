@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 
-
 def process_image(image_bin):
     """
     externally callable function to run processing pipeline
@@ -15,8 +14,6 @@ def process_image(image_bin):
     values = _get_rgb_avg(masked_image)
     return values
 
-
-
 def _mask_image(image, radius):
 
     mask = np.zeros(image.shape[:2], dtype = "uint8")
@@ -24,8 +21,6 @@ def _mask_image(image, radius):
     masked = cv2.bitwise_and(image, image, mask=mask)
 
     return masked
-
-
 
 def _get_rgb_avg(image):
     bgr = []
