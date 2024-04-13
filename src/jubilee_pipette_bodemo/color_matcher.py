@@ -1,15 +1,15 @@
-
 import cv2
+import json
 import jubilee_protocols
 import matplotlib.pyplot as plt
 import numpy as np
 import skopt.acquisition as acquisitions
-
+# 
 from colormath.color_diff import delta_e_cie2000
 from colormath.color_objects import LabColor, sRGBColor
 from colormath.color_conversions import convert_color
-from skopt import gp_minimize, Optimizer
-
+from datetime import date
+from skopt import Optimizer
 
 
 # Workaround: https://github.com/gtaylor/python-colormath/issues/104
@@ -26,29 +26,50 @@ class ColorMatcher:
         self.sample_volume = sample_volume
         self.optimal_proportions = None
         self.observed_colors = []
-        self.color_composition = []
+        self.sample_composition = []
         self.color_scores = []
         self.images = []
         # Initialize optimizer
         self.optimizer = Optimizer([(0,1)] * self.nstocks, base_estimator = 'GP',
                                    acq_func ='EI',acq_optimizer='sampling', n_initial_points=0) # is it ok to initialize with 0 points?
 
-    def generate_initial_data(self, n_samples, sample_volume):
+    def generate_initial_data(self, n_samples):
         # Generate n_samples random color samples presented as proportions of stock colors volumes
         color_samples = np.random.dirichlet(np.ones(self.nstocks), n_samples)
-        volumes = [sample_volume * sample for sample in color_samples]
-        return volumes
+        return color_samples
 
-    def inital_data(self, color_volumes:list , color_observations :list ):
+    def run_initial_data(self, robotic_platform, pipette, camera, initial_data,
+                     color_stocks, sample_wells, starting_well = 0 , save =True, saveToFile = True):
 
-        self.color_composition = color_volumes
-        self._inital_data = {'volumes':color_volumes, 'colors': color_observations}
-        self.x0 = np.array(color_volumes)
-        self.y0 = np.array([self.color_score(color) for color in color_observations])
+        assert len(sample_wells.wells) > len(initial_data), 'Error: Too many samples to test for number of wells in labware.'
 
-         # assuming base Gaussian process estimator
-        self.optimizer.tell(self.x0, self.y0)
+        self.initial_data= []
 
+        for i in range(len(initial_data)):
+            data={}
+            well = sample_wells[i+starting_well]
+            # run point in real world
+            print(f'Dispensing into well {well}')
+            query_point = initial_data[i]
+            observed_RGB, image = jubilee_protocols.sample_point(robotic_platform, pipette, camera, query_point,
+                                                            self.sample_volume, well, color_stocks, save=save)
+
+            print(f'RGB values observed: {observed_RGB}')
+            self.update(query_point, observed_RGB, image)
+    
+            data['Sample_id'] = f'{well.name}_{well.slot}'
+            data['Stock_volumes'] = list(query_point)
+            data['RGB_measured'] = observed_RGB
+            self.initial_data.append(data)        
+
+        if saveToFile ==True:
+            td = date.today().strftime("%Y%m%d")
+            filename = f'{td}_initial_data_random_{len(initial_data)}.jsonl'
+            with open(filename, 'wt') as f:
+                 for entry in self.initial_data:
+                    f.write(json.dumps(entry) + '\n')
+
+        return 
 
     def color_score(self, color):
         # color : list of rgb values of sampled color
@@ -67,33 +88,29 @@ class ColorMatcher:
 
     def update(self, color_volumes, observed_color, image):
 
-        self.color_composition.append(color_volumes)
+        self.sample_composition.append(list(color_volumes))
         self.images.append(image)
         self.observed_colors.append(sRGBColor(*observed_color, is_upscaled =True))
         
         color_score = self.color_score(observed_color)
         self.color_scores.append(color_score)
         
-        self.optimizer.tell(np.array(self.color_composition),np.array( self.color_scores))
-        self.optimal_proportions = [self.color_composition[i] for i in np.argmin(self.color_scores)]
-       
+        self.optimizer.tell(self.sample_composition,self.color_scores)
+        self.optimal_proportions = self.sample_composition[np.argmin(self.color_scores)]
 
     def propose_next_sample(self):
-        return  self.optimizer.ask()
+
+        next_sample = self.optimizer.ask()
+        normed_sample = [x/sum(next_sample) for x in next_sample]   
+
+        return  normed_sample
 
     def get_optimal_proportions(self):
          return self.optimal_proportions
     
-    def visualize(self):
+    def visualize(self, fig, ax):
 
-        #set up image display
-        plt.ion()
-        fig, ax = plt.subplots(1,2, figsize = (20,8))
-        ax[0].set_title('Most Recent Image')
-        ax[1].set_title('Color Loss Plot')
-        ax[1].set_xlabel('Iteration')
-        ax[1].set_ylabel('Loss')
-
+        
         # get data in the right form for plotting
         norm_colors = [rgb.get_value_tuple() for rgb in self.observed_colors]
         loss_vals = self.color_scores
@@ -104,9 +121,8 @@ class ColorMatcher:
         imgcv_rgb = imgcv[:,:,[2,1,0]]
 
         # plot and update 
-        for i, loss in enumerate(loss_vals):
-            ax[1].scatter(i, loss_vals[i], marker = 'o', color = norm_colors[i], s = 200)
-            ax[0].imshow(imgcv_rgb)
+        ax[1].scatter(range(len(loss_vals)), loss_vals, marker = 'o', color = norm_colors, s = 200)
+        ax[0].imshow(imgcv_rgb)
 
         fig.canvas.draw()
         fig.canvas.flush_events()
@@ -129,9 +145,18 @@ class ColorMatcher:
                                                             self.sample_volume, well, color_stocks, save=save)
 
             print(f'RGB values observed: {observed_RGB}')
-            self.update(self, query_point, observed_RGB, image)
+            self.update(query_point, observed_RGB, image)
+            
+            #set up image display
+            plt.ion()
+            fig, ax = plt.subplots(1,2, figsize = (20,8))
+            ax[0].set_title('Most Recent Image')
+            ax[1].set_title('Color Loss Plot')
+            ax[1].set_xlabel('Iteration')
+            ax[1].set_ylabel('Loss')
+
             try:
-                self.visualize()
+                self.visualize(fig, ax)
             except Exception as e:
                 print(e)
                 pass

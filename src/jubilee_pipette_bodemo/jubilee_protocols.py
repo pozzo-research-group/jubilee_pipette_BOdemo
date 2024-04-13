@@ -7,7 +7,8 @@ from datetime import date
 
 
 
-def sample_point(jubilee, pipette, Camera, color_composition: tuple, volume: float, well, color_stocks, save =True):
+def sample_point(jubilee, pipette, Camera, sample_composition: tuple, sample_volume: float,
+                 well, color_stocks, save =True):
     """
     Sample a specified point. 
 
@@ -15,7 +16,7 @@ def sample_point(jubilee, pipette, Camera, color_composition: tuple, volume: flo
     jubilee: Jubilee Machine object
     Pipette: Jubilee library pipette object, configured
     Camera: Jubilee library camera tool
-    color_composition (tuple) - (R, Y, B) values - either 0-1 or 0-255.
+    sample_composition (tuple) - stock color values - either 0-1 or 0-sample_volume.
     volume: total sample volume
     well: location to prepare sample
     red_stock: location for red stock 
@@ -26,8 +27,14 @@ def sample_point(jubilee, pipette, Camera, color_composition: tuple, volume: flo
     -------
     RGB - tuple RGB value of resulting solution
     """
-
-    volumes = color_composition*volume
+    # Calculate volumes
+    if np.round(np.sum(sample_composition)) == 1:
+        volumes = [sample_volume * sample for sample in sample_composition]
+    elif np.round(np.sum(sample_composition)) == sample_volume:
+        volumes = sample_composition
+    else:
+        print(f'Error: Color composition does not sum to 1 or expected sample volume of {sample_volume}')
+    
     print('Calculated volumes: ', volumes)
 
     # Let's check so that we can mix after the last color was added
@@ -40,7 +47,7 @@ def sample_point(jubilee, pipette, Camera, color_composition: tuple, volume: flo
 
 
     pipette.transfer(volumes, color_stocks, well.top(-1), 
-                     blowout = True, new_tip='once', mix_after = (275, 5, color_stocks[stock_to_mix]))
+                     blowout = True, new_tip='once', mix_after = (275, 3, color_stocks[stock_to_mix]))
 
     jubilee.pickup_tool(Camera)
 
@@ -53,7 +60,7 @@ def sample_point(jubilee, pipette, Camera, color_composition: tuple, volume: flo
     if save:
         td = date.today().strftime("%Y%m%d")
         filename = f"{td}_{well.name}_{well.slot}"
-        img.save_image(image, './', filename)
+        img.save_image(image, filename)
 
     return RGB, image
 
