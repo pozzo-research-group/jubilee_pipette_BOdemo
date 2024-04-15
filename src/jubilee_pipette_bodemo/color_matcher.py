@@ -3,13 +3,14 @@ import json
 import jubilee_protocols
 import matplotlib.pyplot as plt
 import numpy as np
-import skopt.acquisition as acquisitions
-# 
+
 from colormath.color_diff import delta_e_cie2000
 from colormath.color_objects import LabColor, sRGBColor
 from colormath.color_conversions import convert_color
 from datetime import date
+from sklearn.gaussian_process.kernels import Matern
 from skopt import Optimizer
+from skopt.learning import GaussianProcessRegressor
 
 
 # Workaround: https://github.com/gtaylor/python-colormath/issues/104
@@ -30,9 +31,10 @@ class ColorMatcher:
         self.color_scores = []
         self.images = []
         # Initialize optimizer
-        self.optimizer = Optimizer([(0,1)] * self.nstocks, base_estimator = 'GP',
-                                   acq_func ='EI',acq_optimizer='sampling', n_initial_points=0) # is it ok to initialize with 0 points?
-
+        self.optimizer = Optimizer([(0,1)] * self.nstocks, acq_func ='EI', acq_func_kwargs={'xi': 0.3},
+                                   base_estimator = GaussianProcessRegressor(kernel=Matern(length_scale=1.0, nu=0.5)),
+                                   n_initial_points=3, acq_optimizer='sampling') 
+        
     def generate_initial_data(self, n_samples):
         # Generate n_samples random color samples presented as proportions of stock colors volumes
         color_samples = np.random.dirichlet(np.ones(self.nstocks), n_samples)
@@ -95,13 +97,16 @@ class ColorMatcher:
         color_score = self.color_score(observed_color)
         self.color_scores.append(color_score)
         
-        self.optimizer.tell(self.sample_composition,self.color_scores)
+        self.optimizer.tell(self.sample_composition[-1], self.color_scores[-1])
         self.optimal_proportions = self.sample_composition[np.argmin(self.color_scores)]
 
     def propose_next_sample(self):
 
         next_sample = self.optimizer.ask()
-        normed_sample = [x/sum(next_sample) for x in next_sample]   
+        if sum(next_sample) == 0:
+            normed_sample = [0,0,0]
+        else:
+            normed_sample = [x/sum(next_sample) for x in next_sample]   
 
         return  normed_sample
 
@@ -110,7 +115,6 @@ class ColorMatcher:
     
     def visualize(self, fig, ax):
 
-        
         # get data in the right form for plotting
         norm_colors = [rgb.get_value_tuple() for rgb in self.observed_colors]
         loss_vals = self.color_scores
@@ -135,45 +139,52 @@ class ColorMatcher:
         assert len(samples.wells) > number_of_iterations, 'Error: Too many samples to test for number of wells in labware.'
 
         data_to_save = []
-        
+        data_to_save.append("------ Target Color ------")
+        data_to_save.append(self.target_color)
+        data_to_save.append("------ Campaign Data ------")
         for i in range(number_of_iterations):
             data = {}
             well = samples[i+starting_well]
             # run point in real world
             print(f'Dispensing into well {well}')
             query_point = self.propose_next_sample()
-            print(f'RYB values tested: {query_point}')
 
-            observed_RGB, image = jubilee_protocols.sample_point(robotic_platform, pipette, camera, query_point,
-                                                            self.sample_volume, well, color_stocks, save=save)
+            if sum(query_point) == 0:
+                print('All stock volumes are zero. Skipping this iteration.')
+                self.optimizer.tell(query_point, 10e5) # will need to check that this is ok!
+            else:
+                print(f'RYB values tested: {query_point}')
 
-            print(f'RGB values observed: {observed_RGB}')
-            self.update(query_point, observed_RGB, image)
-            
-            #set up image display
-            plt.ion()
-            fig, ax = plt.subplots(1,2, figsize = (20,8))
-            ax[0].set_title('Most Recent Image')
-            ax[1].set_title('Color Loss Plot')
-            ax[1].set_xlabel('Iteration')
-            ax[1].set_ylabel('Loss')
+                observed_RGB, image = jubilee_protocols.sample_point(robotic_platform, pipette, camera, query_point,
+                                                                self.sample_volume, well, color_stocks, save=save)
 
-            try:
-                self.visualize(fig, ax)
-            except Exception as e:
-                print(e)
-                pass
+                print(f'RGB values observed: {observed_RGB}')
+                self.update(query_point, observed_RGB, image)
                 
-            data['Sample_id'] = f'{well.name}_{well.slot}'
-            data['Stock_volumes'] = list(query_point)
-            data['RGB_measured'] = observed_RGB
-            data_to_save.append(data)
+                #set up image display
+                plt.ion()
+                fig, ax = plt.subplots(1,2, figsize = (20,8))
+                ax[0].set_title('Most Recent Image')
+                ax[1].set_title('Color Loss Plot')
+                ax[1].set_xlabel('Iteration')
+                ax[1].set_ylabel('Loss')
 
-        if saveToFile ==True:
-            td = date.today().strftime("%Y%m%d")
-            filename = f'{td}_ColorMatcher_results.jsonl'
-            with open(filename, 'wt') as f:
-                 for entry in data_to_save:
-                    f.write(json.dumps(entry) + '\n')      
+                try:
+                    self.visualize(fig, ax)
+                except Exception as e:
+                    print(e)
+                    pass
+                    
+                data['Sample_id'] = f'{well.name}_{well.slot}'
+                data['Stock_volumes'] = list(query_point)
+                data['RGB_measured'] = observed_RGB
+                data_to_save.append(data)
+
+            if saveToFile ==True:
+                td = date.today().strftime("%Y%m%d")
+                filename = f'{td}_ColorMatcher_results.jsonl'
+                with open(filename, 'wt') as f:
+                    for entry in data_to_save:
+                        f.write(json.dumps(entry) + '\n')      
         
         return 
