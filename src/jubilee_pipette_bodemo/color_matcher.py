@@ -130,11 +130,14 @@ class ColorMatcher:
         return
     
     def run_campaign(self, number_of_iterations, robotic_platform, pipette, camera,
-                     color_stocks, samples, starting_well = 0 ,save =True):
+                     color_stocks, samples, starting_well = 0 ,save =True, saveToFile = True):
 
         assert len(samples.wells) > number_of_iterations, 'Error: Too many samples to test for number of wells in labware.'
 
+        data_to_save = []
+        
         for i in range(number_of_iterations):
+            data = {}
             well = samples[i+starting_well]
             # run point in real world
             print(f'Dispensing into well {well}')
@@ -160,5 +163,17 @@ class ColorMatcher:
             except Exception as e:
                 print(e)
                 pass
+                
+            data['Sample_id'] = f'{well.name}_{well.slot}'
+            data['Stock_volumes'] = list(query_point)
+            data['RGB_measured'] = observed_RGB
+            data_to_save.append(data)
+
+        if saveToFile ==True:
+            td = date.today().strftime("%Y%m%d")
+            filename = f'{td}_ColorMatcher_results.jsonl'
+            with open(filename, 'wt') as f:
+                 for entry in data_to_save:
+                    f.write(json.dumps(entry) + '\n')      
         
         return 
