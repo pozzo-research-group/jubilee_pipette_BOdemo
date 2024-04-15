@@ -25,7 +25,7 @@ class ColorMatcher:
         self.sample_volume = sample_volume
         self.optimal_proportions = None
         self.observed_colors = []
-        self.color_composition = []
+        self.sample_composition = []
         self.color_scores = []
         self.images = []
         # Initialize optimizer
@@ -85,7 +85,7 @@ class ColorMatcher:
 
     def update(self, color_volumes, observed_color, image):
 
-        self.color_composition.append(color_volumes)
+        self.sample_composition.append(list(color_volumes))
         self.images.append(image)
         self.observed_colors.append(sRGBColor(*observed_color, is_upscaled =True))
         
@@ -147,9 +147,7 @@ class ColorMatcher:
         ax[1].set_title('Color Loss Plot')
         ax[1].set_xlabel('Iteration')
         ax[1].set_ylabel('Loss')
-        
-        
-        
+               
         for i in range(number_of_iterations):
             data = {}
             well = samples[i+starting_well]
@@ -169,7 +167,6 @@ class ColorMatcher:
                 print(f'RGB values observed: {observed_RGB}')
                 self.update(query_point, observed_RGB, image)
                 
-
                 try:
                     self.visualize(fig, ax)
                 except Exception as e:
