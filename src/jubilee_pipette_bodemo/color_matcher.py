@@ -98,6 +98,9 @@ class ColorMatcher:
                  for entry in self.initial_data:
                     f.write(json.dumps(entry) + '\n')
 
+        ## Update the optimizer with the initial data
+        self.optimizer.update(np.asarray(self.sample_composition), np.asarray(self.color_scores).reshape(-1,1))
+
         return 
 
     def color_score(self, color):
@@ -113,18 +116,15 @@ class ColorMatcher:
         
         return distance
 
-    def update(self, color_volumes, observed_color, image):
+    def update(self, color_volumes, observed_color, image = None):
 
         self.sample_composition.append(list(color_volumes))
-        self.images.append(image)
         self.observed_colors.append(sRGBColor(*observed_color, is_upscaled =True))
         
         color_score = self.color_score(observed_color)
         self.color_scores.append(color_score)
+        self.images.append(image)
 
-        ## Update the optimizer with the initial data
-        self.optimizer.update(np.array(self.sample_composition), np.array( self.color_scores))
-        self.optimal_proportions = [self.sample_composition[i] for i in np.argmin(self.color_scores)]
                
     def propose_next_sample(self):
 
@@ -137,7 +137,8 @@ class ColorMatcher:
         return  normed_sample
 
     def get_optimal_proportions(self):
-         return self.optimal_proportions
+        self.optimal_proportions = [self.sample_composition[i] for i in np.argmin(self.color_scores)]
+        return self.optimal_proportions
     
     def visualize(self, fig, ax):
 
@@ -196,6 +197,8 @@ class ColorMatcher:
 
                 print(f'RGB values observed: {observed_RGB}')
                 self.update(query_point, observed_RGB, image)
+                ## Update the optimizer with data
+                self.optimizer.update(np.array(self.sample_composition), np.array(self.color_scores))
                 
                 try:
                     self.visualize(fig, ax)

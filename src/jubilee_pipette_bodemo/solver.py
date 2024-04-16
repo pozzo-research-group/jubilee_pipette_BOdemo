@@ -29,18 +29,17 @@ class BaysOptimizer():
     def data_utils(data):
 
         if isinstance(data, np.ndarray):
-            data = torch.from_numpy(data)
+            data_ = torch.from_numpy(data)
         else:
-            data = torch.from_numpy(np.ndarray(data))
+            data = torch.from_numpy(np.array(data))
         
-        return data
+        return data_
 
     def update(self, x_data, y_data):
 
         x_data = self.data_utils(x_data)
         y_data = -1*self.data_utils(y_data)
 
-        y_data.reshape(-1,1)
         gp_model = initialize_model(self.model_name, self.model_args, self.design_space_dim,self.output_dim) 
 
         normalized_x = normalize(x_data, self.tensor_bounds)
