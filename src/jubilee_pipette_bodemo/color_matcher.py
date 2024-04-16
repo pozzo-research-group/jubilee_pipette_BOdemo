@@ -1,6 +1,8 @@
 import cv2
 import json
 import jubilee_protocols
+
+import ipywidgets as widgets
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -19,9 +21,9 @@ setattr(np, "asscalar", patch_asscalar)
 
 
 class ColorMatcher:
-    def __init__(self, total_stocks, target_color, sample_volume):
+    def __init__(self, total_stocks, sample_volume):
         self.nstocks = total_stocks
-        self.target_color = target_color
+        self.target_color = None
         self.sample_volume = sample_volume
         self.optimal_proportions = None
         self.observed_colors = []
@@ -29,8 +31,36 @@ class ColorMatcher:
         self.color_scores = []
         self.images = []
         # Initialize optimizer
-        self.optimizer = BaysOptimizer([(0,1)] * self.nstocks, bathc_size = 1) 
+        self.optimizer = BaysOptimizer([(0,1)] * self.nstocks, batch_size = 1) 
         self.model = self.optimizer.model
+
+    def select_target_color(self):
+        
+        def pick_a_color():
+            color_picker = widgets.ColorPicker(
+                concise=False,
+                description='Pick a color',
+                value='blue',
+                disabled=False
+            )
+            
+            return color_picker
+
+        color_picker = pick_a_color()
+        target_rgb_output = []
+
+        def on_color_change(change):
+            hexcode = change['new']
+            target_rgb = tuple(int(hexcode.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
+            target_rgb_output.clear()
+            target_rgb_output.extend(target_rgb)
+        color_picker.observe(on_color_change, names='value')
+        
+        display(color_picker)
+    
+        self.target_color = target_rgb_output
+        return target_rgb_output
+
 
     def generate_initial_data(self, n_samples):
         # Generate n_samples random color samples presented as proportions of stock colors volumes
@@ -93,8 +123,8 @@ class ColorMatcher:
         self.color_scores.append(color_score)
 
         ## Update the optimizer with the initial data
-        self.optimizer.update(np.array(self.color_composition), np.array( self.color_scores))
-        self.optimal_proportions = [self.color_composition[i] for i in np.argmin(self.color_scores)]
+        self.optimizer.update(np.array(self.sample_composition), np.array( self.color_scores))
+        self.optimal_proportions = [self.sample_composition[i] for i in np.argmin(self.color_scores)]
                
     def propose_next_sample(self):
 

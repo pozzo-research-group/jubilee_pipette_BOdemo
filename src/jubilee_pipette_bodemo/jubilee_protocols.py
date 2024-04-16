@@ -47,7 +47,7 @@ def sample_point(jubilee, pipette, Camera, sample_composition: tuple, sample_vol
 
 
     pipette.transfer(volumes, color_stocks, well.top(-1), 
-                     blowout = True, new_tip='once', mix_after = (275, 3, color_stocks[stock_to_mix]))
+                     blowout = True, new_tip='once', mix_after = (275, 5, color_stocks[stock_to_mix]))
 
     jubilee.pickup_tool(Camera)
 
