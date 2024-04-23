@@ -21,17 +21,19 @@ setattr(np, "asscalar", patch_asscalar)
 
 
 class ColorMatcher:
-    def __init__(self, total_stocks, sample_volume):
+    def __init__(self, total_stocks, sample_volume, score_type = 'euclidean', task = 'minimize'):
         self.nstocks = total_stocks
         self.target_color = None
         self.sample_volume = sample_volume
         self.optimal_proportions = None
+        self.score_type = score_type
+        self.task = task
         self.observed_colors = []
         self.sample_composition = []
         self.color_scores = []
         self.images = []
         # Initialize optimizer
-        self.optimizer = BaysOptimizer([(0,1)] * self.nstocks, batch_size = 1) 
+        self.optimizer = BaysOptimizer([(0,1.0)] * self.nstocks, batch_size = 1, task = self.task) 
         self.model = self.optimizer.model
 
     def select_target_color(self):
@@ -43,7 +45,6 @@ class ColorMatcher:
                 value='blue',
                 disabled=False
             )
-            
             return color_picker
 
         color_picker = pick_a_color()
@@ -60,8 +61,7 @@ class ColorMatcher:
     
         self.target_color = target_rgb_output
         return target_rgb_output
-
-
+    
     def generate_initial_data(self, n_samples):
         # Generate n_samples random color samples presented as proportions of stock colors volumes
         color_samples = np.random.dirichlet(np.ones(self.nstocks), n_samples)
@@ -103,25 +103,33 @@ class ColorMatcher:
 
         return 
 
-    def color_score(self, color):
+    def color_score(self, color, score_type = 'euclidean'):
         # color : list of rgb values of sampled color
-        # Convert RGB color to Lab color (CIE L*a*b* color space)
+        
         target_rgb = sRGBColor(*self.target_color, is_upscaled =True if max(self.target_color) > 1 else False)
         color_rgb = sRGBColor(*color, is_upscaled =True if max(color) > 1 else False)
-        target_lab = convert_color(target_rgb, LabColor)
-        mixed_lab = convert_color(color_rgb, LabColor)
-        # Calculate CIEDE2000 color difference
-        distance = delta_e_cie2000(LabColor(target_lab.lab_l, target_lab.lab_a, target_lab.lab_b),
-                                   LabColor(mixed_lab.lab_l, mixed_lab.lab_a, mixed_lab.lab_b))
-        
-        return distance
+        if score_type == 'CIE2000':
+            # Convert RGB color to Lab color (CIE L*a*b* color space)
+            target_lab = convert_color(target_rgb, LabColor)
+            mixed_lab = convert_color(color_rgb, LabColor)
+            # Calculate CIEDE2000 color difference
+            distance = delta_e_cie2000(LabColor(target_lab.lab_l, target_lab.lab_a, target_lab.lab_b),
+                                    LabColor(mixed_lab.lab_l, mixed_lab.lab_a, mixed_lab.lab_b))
+            return distance
+
+        elif score_type == 'euclidean':  
+
+            distance = [np.abs(np.array(t) - np.array(m)) for t, m in zip(target_rgb.get_value_tuple(), color_rgb.get_value_tuple())]
+            score = np.linalg.norm(distance)
+
+            return score
 
     def update(self, color_volumes, observed_color, image = None):
 
         self.sample_composition.append(list(color_volumes))
-        self.observed_colors.append(sRGBColor(*observed_color, is_upscaled =True))
+        self.observed_colors.append(observed_color)
         
-        color_score = self.color_score(observed_color)
+        color_score = self.color_score(observed_color, score_type = self.score_type)
         self.color_scores.append(color_score)
         self.images.append(image)
 
@@ -129,12 +137,8 @@ class ColorMatcher:
     def propose_next_sample(self):
 
         next_sample = self.optimizer.ask()
-        if sum(next_sample) == 0:
-            normed_sample = [0,0,0]
-        else:
-            normed_sample = [x/sum(next_sample) for x in next_sample]   
 
-        return  normed_sample
+        return  next_sample
 
     def get_optimal_proportions(self):
         self.optimal_proportions = [self.sample_composition[i] for i in np.argmin(self.color_scores)]
@@ -143,13 +147,14 @@ class ColorMatcher:
     def visualize(self, fig, ax):
 
         # get data in the right form for plotting
-        norm_colors = [rgb.get_value_tuple() for rgb in self.observed_colors]
+
+        norm_colors = [[c/255 for c in rgb] for rgb in self.observed_colors]
         loss_vals = self.color_scores
         
         image = self.images[-1]
         imgbuf = np.frombuffer(image, dtype = np.uint8)
         imgcv = cv2.imdecode(imgbuf, cv2.IMREAD_COLOR)
-        imgcv_rgb = imgcv[:,:,[2,1,0]]
+        imgcv_rgb = cv2.cvtColor(imgcv, cv2.COLOR_BGR2RGB)
 
         # plot and update 
         ax[1].scatter(range(len(loss_vals)), loss_vals, marker = 'o', color = norm_colors, s = 200)
@@ -184,7 +189,10 @@ class ColorMatcher:
             well = samples[i+starting_well]
             # run point in real world
             print(f'Dispensing into well {well}')
-            query_point = self.propose_next_sample()
+            if self.sample_composition == []:
+                query_point = self.generate_initial_data(1)[0]
+            else:
+                query_point = self.propose_next_sample()
 
             if sum(query_point) == 0:
                 print('All stock volumes are zero. Skipping this iteration.')
@@ -198,7 +206,7 @@ class ColorMatcher:
                 print(f'RGB values observed: {observed_RGB}')
                 self.update(query_point, observed_RGB, image)
                 ## Update the optimizer with data
-                self.optimizer.update(np.array(self.sample_composition), np.array(self.color_scores))
+                self.optimizer.update(np.array(self.sample_composition), np.array(self.color_scores).reshape(-1,1))
                 
                 try:
                     self.visualize(fig, ax)
@@ -209,6 +217,7 @@ class ColorMatcher:
                 data['Sample_id'] = f'{well.name}_{well.slot}'
                 data['Stock_volumes'] = list(query_point)
                 data['RGB_measured'] = observed_RGB
+                data['Score'] = self.color_scores[-1]
                 data_to_save.append(data)
 
             if saveToFile ==True:

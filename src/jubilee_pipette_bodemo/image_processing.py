@@ -28,7 +28,7 @@ def _mask_image(image, radius= 40):
     w = image_shape[0]//2
     h = image_shape[1]//2
     mask = np.zeros(image_shape, dtype = "uint8")
-    cv2.circle(mask, (w, w), radius, 255, -1)
+    cv2.circle(mask, (w, h), radius, 255, -1)
     masked = cv2.bitwise_and(image, image, mask=mask)
 
     return masked
@@ -45,6 +45,7 @@ def _get_rgb_avg(image):
     rgb = [bgr[i] for i in [2,1,0]]
 
     return rgb
+
 
 def save_image(image_bin, filename):
     image_arr = np.frombuffer(image_bin, np.uint8)
