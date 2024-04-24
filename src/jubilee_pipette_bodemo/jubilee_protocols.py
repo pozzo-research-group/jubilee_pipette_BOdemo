@@ -1,7 +1,7 @@
 """
 This module should handle all interactions with the real world
 """
-import image_processing as img
+import jubilee_pipette_bodemo.image_processing as img
 import numpy as np
 from datetime import date
 

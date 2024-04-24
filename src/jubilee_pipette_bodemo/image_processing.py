@@ -14,7 +14,7 @@ def process_image(image_bin):
     values = _get_rgb_avg(masked_image)
     return values
 
-def _mask_image(image, radius= 40):
+def _mask_image(image, radius= 50):
     """Apply a circular mask to an image
 
     :param image: the image object

@@ -1,6 +1,6 @@
 import cv2
 import json
-import jubilee_protocols
+import jubilee_pipette_bodemo.jubilee_protocols
 
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
@@ -10,7 +10,7 @@ from colormath.color_diff import delta_e_cie2000
 from colormath.color_objects import LabColor, sRGBColor
 from colormath.color_conversions import convert_color
 from datetime import date
-from solver import BaysOptimizer
+from jubilee_pipette_bodemo.solver import BaysOptimizer
 
 
 # Workaround: https://github.com/gtaylor/python-colormath/issues/104

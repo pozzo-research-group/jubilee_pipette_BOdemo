@@ -24,7 +24,7 @@ class BaysOptimizer():
         self.design_space_dim = len(bounds)
         self.output_dim = 1
         self.model_args =  {"model":self.model_name,
-                            "num_epochs" : 100,
+                            "num_epochs" : 500,
                             "learning_rate" : 1e-3,
                             "verbose": 0}
     @staticmethod
