@@ -1,6 +1,6 @@
 import cv2
 import json
-import jubilee_pipette_bodemo.jubilee_protocols
+import jubilee_pipette_bodemo.jubilee_protocols as jubilee_protocols
 
 import ipywidgets as widgets
 import matplotlib.pyplot as plt
