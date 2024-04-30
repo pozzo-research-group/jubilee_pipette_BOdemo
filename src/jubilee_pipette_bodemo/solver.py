@@ -1,19 +1,24 @@
 import numpy as np
+import botorch
 import torch
 
 torch.set_default_dtype(torch.double)
 
-from botorch.acquisition.monte_carlo import qExpectedImprovement
-from botorch.sampling.normal import SobolQMCNormalSampler 
+from botorch.acquisition.analytic import LogExpectedImprovement
+from botorch.models.transforms.outcome import Standardize 
 from botorch.optim import optimize_acqf
-from botorch.sampling.stochastic_samplers import StochasticSampler 
 from botorch.utils.transforms import normalize, unnormalize
+from sklearn.gaussian_process import kernels
 
-from bot.models.utils import initialize_model
+import torch
+
+from botorch.fit import fit_gpytorch_mll
+from botorch.models import SingleTaskGP
+from gpytorch.mlls import ExactMarginalLogLikelihood
 
 
 class BaysOptimizer():
-    def __init__(self, bounds, batch_size, task = 'maximize'):
+    def __init__(self, bounds, batch_size, task = 'maximize', nu = 5/2):
         self.model_name = "gp"
         self.model = None
         self.acq_func = None
@@ -23,10 +28,8 @@ class BaysOptimizer():
         self.batch = batch_size
         self.design_space_dim = len(bounds)
         self.output_dim = 1
-        self.model_args =  {"model":self.model_name,
-                            "num_epochs" : 500,
-                            "learning_rate" : 1e-3,
-                            "verbose": 0}
+        self.nu = nu
+
     @staticmethod
     def data_utils(data):
 
@@ -50,18 +53,11 @@ class BaysOptimizer():
         else:
             raise ValueError(f'Task must be either maximize or minimize, not {self.task}')
 
-        gp_model = initialize_model(self.model_name, self.model_args, self.design_space_dim, self.output_dim) 
-
         normalized_x = normalize(x_data, self.tensor_bounds)
-        gp_model = gp_model.fit(normalized_x, y_data)
-        
-        self.model = gp_model
-
-        sampler = StochasticSampler(torch.Size([128]))
-        acquisition = qExpectedImprovement(self.model, best_f = best, sampler= sampler)
-
+        self.initialize_model(normalized_x, y_data)
+      
+        acquisition = LogExpectedImprovement(self.model, best_f = best)
         self.acq_func = acquisition
-        
         return 
     
     def ask(self):
@@ -86,4 +82,15 @@ class BaysOptimizer():
 
         return new_x.numpy().squeeze()
 
-    
+    def initialize_model(self,x_data, y_data ):
+        kernel = kernels.Matern(nu = self.nu)
+        gp_model = SingleTaskGP(x_data, y_data, outcome_transform=Standardize(m=1), covar_module=kernel).to(x_data)
+
+        mll = ExactMarginalLogLikelihood(gp_model.likelihood, gp_model)
+
+        fit_gpytorch_mll(mll)
+        
+        self.mll = mll
+        self.model = gp_model
+
+        return
