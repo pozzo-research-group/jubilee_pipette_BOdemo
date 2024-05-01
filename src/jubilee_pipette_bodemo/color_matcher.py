@@ -10,7 +10,10 @@ from colormath.color_diff import delta_e_cie2000
 from colormath.color_objects import LabColor, sRGBColor
 from colormath.color_conversions import convert_color
 from datetime import date
-from jubilee_pipette_bodemo.solver import BaysOptimizer
+#from jubilee_pipette_bodemo.solver import BaysOptimizer
+from jubilee_pipette_bodemo.ax_solver import AxSolver 
+
+
 
 
 # Workaround: https://github.com/gtaylor/python-colormath/issues/104
@@ -21,7 +24,7 @@ setattr(np, "asscalar", patch_asscalar)
 
 
 class ColorMatcher:
-    def __init__(self, total_stocks, sample_volume, score_type = 'euclidean', task = 'minimize'):
+    def __init__(self, total_stocks, sample_volume, score_type = 'euclidean', task = 'minimize', n_random_its = 5, n_bo_its = 20):
         self.nstocks = total_stocks
         self.target_color = None
         self.sample_volume = sample_volume
@@ -33,8 +36,8 @@ class ColorMatcher:
         self.color_scores = []
         self.images = []
         # Initialize optimizer
-        self.optimizer = BaysOptimizer([(0,1.0)] * self.nstocks, batch_size = 1, task = self.task) 
-        self.model = self.optimizer.model
+        self.optimizer = get_ax_object(total_stocks, n_random_its, n_bo_its) 
+        self.model = None
 
     def select_target_color(self):
         
@@ -64,8 +67,9 @@ class ColorMatcher:
     
     def generate_initial_data(self, n_samples):
         # Generate n_samples random color samples presented as proportions of stock colors volumes
-        color_samples = np.random.dirichlet(np.ones(self.nstocks), n_samples)
-        return color_samples
+        #color_samples = np.random.dirichlet(np.ones(self.nstocks), n_samples)
+
+        return self.optimizer.ask()
 
     def run_initial_data(self, robotic_platform, pipette, camera, initial_data,
                      color_stocks, sample_wells, starting_well = 0 , save =True, saveToFile = True):
@@ -136,9 +140,9 @@ class ColorMatcher:
                
     def propose_next_sample(self):
 
-        next_sample = self.optimizer.ask()
+        next_sample = self.optimizer.get_next_trial()
 
-        return  next_sample
+        return next_sample
 
     def get_optimal_proportions(self):
         self.optimal_proportions = [self.sample_composition[i] for i in np.argmin(self.color_scores)]
