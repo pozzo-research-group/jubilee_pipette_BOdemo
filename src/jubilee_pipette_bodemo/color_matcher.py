@@ -36,7 +36,7 @@ class ColorMatcher:
         self.color_scores = []
         self.images = []
         # Initialize optimizer
-        self.optimizer = get_ax_object(total_stocks, n_random_its, n_bo_its) 
+        self.optimizer = AxSolver(total_stocks, n_random_its, n_bo_its) 
         self.model = None
 
     def select_target_color(self):
@@ -140,7 +140,7 @@ class ColorMatcher:
                
     def propose_next_sample(self):
 
-        next_sample = self.optimizer.get_next_trial()
+        next_sample = self.optimizer.ask()
 
         return next_sample
 
@@ -194,7 +194,8 @@ class ColorMatcher:
             # run point in real world
             print(f'Dispensing into well {well}')
             if self.sample_composition == []:
-                query_point = self.generate_initial_data(1)[0]
+                query_point = self.generate_initial_data(1)
+                print(query_point)
             else:
                 query_point = self.propose_next_sample()
 
