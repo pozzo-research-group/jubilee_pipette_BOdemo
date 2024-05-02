@@ -12,6 +12,7 @@ from colormath.color_conversions import convert_color
 from datetime import date
 #from jubilee_pipette_bodemo.solver import BaysOptimizer
 from jubilee_pipette_bodemo.ax_solver import AxSolver 
+from jubilee_pipette_bodemo import in_silico_mixing
 
 
 
@@ -24,7 +25,7 @@ setattr(np, "asscalar", patch_asscalar)
 
 
 class ColorMatcher:
-    def __init__(self, total_stocks, sample_volume, score_type = 'euclidean', task = 'minimize', n_random_its = 5, n_bo_its = 20):
+    def __init__(self, total_stocks, sample_volume, score_type = 'euclidean', task = 'minimize', n_random_its = 5, n_bo_its = 20, in_silico_mixing = False, in_silico_colors = None):
         self.nstocks = total_stocks
         self.target_color = None
         self.sample_volume = sample_volume
@@ -38,6 +39,11 @@ class ColorMatcher:
         # Initialize optimizer
         self.optimizer = get_ax_object(total_stocks, n_random_its, n_bo_its) 
         self.model = None
+        self.in_silico_mixing = in_silico_mixing
+        self.in_silico_colors = in_silico_colors
+
+        if in_silico_mixing:
+            assert len(in_silico_colors) == total_stocks, "When using in silico mixing, you must supply a list of RGB colors `in_silico_colors` with the same number of colors as `total_stocks`"
 
     def select_target_color(self):
         
@@ -204,8 +210,11 @@ class ColorMatcher:
             else:
                 print(f'RYB values tested: {query_point}')
 
-                observed_RGB, image = jubilee_protocols.sample_point(robotic_platform, pipette, camera, query_point,
-                                                                self.sample_volume, well, color_stocks, save=save)
+                if not self.in_silico_mixing:
+                    observed_RGB, image = jubilee_protocols.sample_point(robotic_platform, pipette, camera, query_point,
+                                                                    self.sample_volume, well, color_stocks, save=save)
+                else:
+                    observed_RGB, image = in_silico_mixing.sample_point(query_point, in_silico_colors)
 
                 print(f'RGB values observed: {observed_RGB}')
                 self.update(query_point, observed_RGB, image)
