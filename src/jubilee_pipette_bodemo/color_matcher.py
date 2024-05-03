@@ -178,7 +178,8 @@ class ColorMatcher:
     def run_campaign(self, number_of_iterations, robotic_platform, pipette, camera,
                      color_stocks, samples, starting_well = 0 ,save =True, saveToFile = True):
 
-        assert len(samples.wells) > number_of_iterations, 'Error: Too many samples to test for number of wells in labware.'
+        if not self.in_silico_mixing:
+            assert len(samples.wells) > number_of_iterations, 'Error: Too many samples to test for number of wells in labware.'
 
         data_to_save = []
         data_to_save.append("------ Target Color ------")
@@ -196,9 +197,11 @@ class ColorMatcher:
                
         for i in range(number_of_iterations):
             data = {}
-            well = samples[i+starting_well]
+            if not self.in_silico_mixing:
+                well = samples[i+starting_well]
             # run point in real world
-            print(f'Dispensing into well {well}')
+            if not self.in_silico_mixing:
+                print(f'Dispensing into well {well}')
             if self.sample_composition == []:
                 query_point = self.generate_initial_data(1)
                 print(query_point)
@@ -215,7 +218,7 @@ class ColorMatcher:
                     observed_RGB, image = jubilee_protocols.sample_point(robotic_platform, pipette, camera, query_point,
                                                                     self.sample_volume, well, color_stocks, save=save)
                 else:
-                    observed_RGB, image = in_silico_mixing.sample_point(query_point, in_silico_colors)
+                    observed_RGB, image = in_silico_mixing.sample_point(query_point, self.in_silico_colors)
 
                 print(f'RGB values observed: {observed_RGB}')
                 self.update(query_point, observed_RGB, image)
@@ -228,7 +231,8 @@ class ColorMatcher:
                     print(e)
                     pass
                     
-                data['Sample_id'] = f'{well.name}_{well.slot}'
+                if not self.in_silico_mixing:
+                    data['Sample_id'] = f'{well.name}_{well.slot}'
                 data['Stock_volumes'] = list(query_point)
                 data['RGB_measured'] = observed_RGB
                 data['Score'] = self.color_scores[-1]

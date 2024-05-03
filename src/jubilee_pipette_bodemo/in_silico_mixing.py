@@ -1,7 +1,7 @@
 import mixbox
 import numpy as np
 from PIL import Image
-
+import io
 
 
 # Acts like a drop-in replacement for the jubilee_protocols module here so we can test code and such without firing up a Jubilee
@@ -48,4 +48,7 @@ def synthetic_image(mixed_rgb, image_size = (500,500)):
     rgb = [np.uint8(i) for i in mixed_rgb]
     image_arr = np.ones([image_size[0], image_size[1], 3], dtype = np.uint8)*rgb
     image = Image.fromarray(image_arr, 'RGB')
-    return image.tobytes()
+
+    synth_bytes = io.BytesIO()
+    image.save(synth_bytes, format = 'JPEG')
+    return synth_bytes.getvalue()
