@@ -10,7 +10,12 @@ from colormath.color_diff import delta_e_cie2000
 from colormath.color_objects import LabColor, sRGBColor
 from colormath.color_conversions import convert_color
 from datetime import date
-from jubilee_pipette_bodemo.solver import BaysOptimizer
+#from jubilee_pipette_bodemo.solver import BaysOptimizer
+from jubilee_pipette_bodemo.ax_solver import AxSolver 
+from jubilee_pipette_bodemo.http_solver import HTTPSolver
+from jubilee_pipette_bodemo import in_silico_mixing
+
+
 
 
 # Workaround: https://github.com/gtaylor/python-colormath/issues/104
@@ -21,7 +26,7 @@ setattr(np, "asscalar", patch_asscalar)
 
 
 class ColorMatcher:
-    def __init__(self, total_stocks, sample_volume, score_type = 'euclidean', task = 'minimize'):
+    def __init__(self, total_stocks, sample_volume, score_type = 'euclidean', task = 'minimize', n_random_its = 5, n_bo_its = 20, in_silico_mixing = False, in_silico_colors = None, http_url = 'http://localhost:5000'):
         self.nstocks = total_stocks
         self.target_color = None
         self.sample_volume = sample_volume
@@ -33,8 +38,13 @@ class ColorMatcher:
         self.color_scores = []
         self.images = []
         # Initialize optimizer
-        self.optimizer = BaysOptimizer([(0,1.0)] * self.nstocks, batch_size = 1, task = self.task) 
-        self.model = self.optimizer.model
+        self.optimizer = HTTPSolver(total_stocks, n_random_its, n_bo_its, http_url)#AxSolver(total_stocks, n_random_its, n_bo_its) 
+        self.model = None
+        self.in_silico_mixing = in_silico_mixing
+        self.in_silico_colors = in_silico_colors
+
+        if in_silico_mixing:
+            assert len(in_silico_colors) == total_stocks, "When using in silico mixing, you must supply a list of RGB colors `in_silico_colors` with the same number of colors as `total_stocks`"
 
     def select_target_color(self):
         
@@ -64,8 +74,9 @@ class ColorMatcher:
     
     def generate_initial_data(self, n_samples):
         # Generate n_samples random color samples presented as proportions of stock colors volumes
-        color_samples = np.random.dirichlet(np.ones(self.nstocks), n_samples)
-        return color_samples
+        #color_samples = np.random.dirichlet(np.ones(self.nstocks), n_samples)
+
+        return self.optimizer.ask()
 
     def run_initial_data(self, robotic_platform, pipette, camera, initial_data,
                      color_stocks, sample_wells, starting_well = 0 , save =True, saveToFile = True):
@@ -138,7 +149,7 @@ class ColorMatcher:
 
         next_sample = self.optimizer.ask()
 
-        return  next_sample
+        return next_sample
 
     def get_optimal_proportions(self):
         self.optimal_proportions = [self.sample_composition[i] for i in np.argmin(self.color_scores)]
@@ -168,7 +179,8 @@ class ColorMatcher:
     def run_campaign(self, number_of_iterations, robotic_platform, pipette, camera,
                      color_stocks, samples, starting_well = 0 ,save =True, saveToFile = True):
 
-        assert len(samples.wells) > number_of_iterations, 'Error: Too many samples to test for number of wells in labware.'
+        if not self.in_silico_mixing:
+            assert len(samples.wells) > number_of_iterations, 'Error: Too many samples to test for number of wells in labware.'
 
         data_to_save = []
         data_to_save.append("------ Target Color ------")
@@ -186,11 +198,14 @@ class ColorMatcher:
                
         for i in range(number_of_iterations):
             data = {}
-            well = samples[i+starting_well]
+            if not self.in_silico_mixing:
+                well = samples[i+starting_well]
             # run point in real world
-            print(f'Dispensing into well {well}')
+            if not self.in_silico_mixing:
+                print(f'Dispensing into well {well}')
             if self.sample_composition == []:
-                query_point = self.generate_initial_data(1)[0]
+                query_point = self.generate_initial_data(1)
+                print(query_point)
             else:
                 query_point = self.propose_next_sample()
 
@@ -200,8 +215,11 @@ class ColorMatcher:
             else:
                 print(f'RYB values tested: {query_point}')
 
-                observed_RGB, image = jubilee_protocols.sample_point(robotic_platform, pipette, camera, query_point,
-                                                                self.sample_volume, well, color_stocks, save=save)
+                if not self.in_silico_mixing:
+                    observed_RGB, image = jubilee_protocols.sample_point(robotic_platform, pipette, camera, query_point,
+                                                                    self.sample_volume, well, color_stocks, save=save)
+                else:
+                    observed_RGB, image = in_silico_mixing.sample_point(query_point, self.in_silico_colors)
 
                 print(f'RGB values observed: {observed_RGB}')
                 self.update(query_point, observed_RGB, image)
@@ -214,7 +232,8 @@ class ColorMatcher:
                     print(e)
                     pass
                     
-                data['Sample_id'] = f'{well.name}_{well.slot}'
+                if not self.in_silico_mixing:
+                    data['Sample_id'] = f'{well.name}_{well.slot}'
                 data['Stock_volumes'] = list(query_point)
                 data['RGB_measured'] = observed_RGB
                 data['Score'] = self.color_scores[-1]
