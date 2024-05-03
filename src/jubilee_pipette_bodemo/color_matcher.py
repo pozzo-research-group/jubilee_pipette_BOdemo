@@ -12,6 +12,7 @@ from colormath.color_conversions import convert_color
 from datetime import date
 #from jubilee_pipette_bodemo.solver import BaysOptimizer
 from jubilee_pipette_bodemo.ax_solver import AxSolver 
+from jubilee_pipette_bodemo.http_solver import HTTPSolver
 from jubilee_pipette_bodemo import in_silico_mixing
 
 
@@ -25,7 +26,7 @@ setattr(np, "asscalar", patch_asscalar)
 
 
 class ColorMatcher:
-    def __init__(self, total_stocks, sample_volume, score_type = 'euclidean', task = 'minimize', n_random_its = 5, n_bo_its = 20, in_silico_mixing = False, in_silico_colors = None):
+    def __init__(self, total_stocks, sample_volume, score_type = 'euclidean', task = 'minimize', n_random_its = 5, n_bo_its = 20, in_silico_mixing = False, in_silico_colors = None, http_url = 'http://localhost:5000'):
         self.nstocks = total_stocks
         self.target_color = None
         self.sample_volume = sample_volume
@@ -37,7 +38,7 @@ class ColorMatcher:
         self.color_scores = []
         self.images = []
         # Initialize optimizer
-        self.optimizer = AxSolver(total_stocks, n_random_its, n_bo_its) 
+        self.optimizer = HTTPSolver(total_stocks, n_random_its, n_bo_its, http_url)#AxSolver(total_stocks, n_random_its, n_bo_its) 
         self.model = None
         self.in_silico_mixing = in_silico_mixing
         self.in_silico_colors = in_silico_colors
