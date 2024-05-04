@@ -13,6 +13,7 @@ from datetime import date
 #from jubilee_pipette_bodemo.solver import BaysOptimizer
 from jubilee_pipette_bodemo.ax_solver import AxSolver 
 from jubilee_pipette_bodemo.http_solver import HTTPSolver
+from jubilee_pipette_bodemo.solver import BaysOptimizer
 from jubilee_pipette_bodemo import in_silico_mixing
 
 
@@ -38,7 +39,7 @@ class ColorMatcher:
         self.color_scores = []
         self.images = []
         # Initialize optimizer
-        self.optimizer = HTTPSolver(total_stocks, n_random_its, n_bo_its, http_url)#AxSolver(total_stocks, n_random_its, n_bo_its) 
+        self.optimizer = BaysOptimizer([(0,1.0)] * self.nstocks, 1, task = 'minimize')
         self.model = None
         self.in_silico_mixing = in_silico_mixing
         self.in_silico_colors = in_silico_colors
@@ -74,9 +75,9 @@ class ColorMatcher:
     
     def generate_initial_data(self, n_samples):
         # Generate n_samples random color samples presented as proportions of stock colors volumes
-        #color_samples = np.random.dirichlet(np.ones(self.nstocks), n_samples)
-
-        return self.optimizer.ask()
+        color_samples = np.random.dirichlet(np.ones(self.nstocks), n_samples)[0]
+        return color_samples
+        #return self.optimizer.ask()
 
     def run_initial_data(self, robotic_platform, pipette, camera, initial_data,
                      color_stocks, sample_wells, starting_well = 0 , save =True, saveToFile = True):
@@ -203,11 +204,15 @@ class ColorMatcher:
             # run point in real world
             if not self.in_silico_mixing:
                 print(f'Dispensing into well {well}')
-            if self.sample_composition == []:
+
+            if len(self.sample_composition) < 10:
                 query_point = self.generate_initial_data(1)
                 print(query_point)
             else:
                 query_point = self.propose_next_sample()
+
+            print('query point: ', query_point)
+            print('type query pt: ', type(query_point))
 
             if sum(query_point) == 0:
                 print('All stock volumes are zero. Skipping this iteration.')
@@ -224,6 +229,8 @@ class ColorMatcher:
                 print(f'RGB values observed: {observed_RGB}')
                 self.update(query_point, observed_RGB, image)
                 ## Update the optimizer with data
+                print('color score: ', self.color_scores)
+                print('type: ', type(self.color_scores))
                 self.optimizer.update(np.array(self.sample_composition), np.array(self.color_scores).reshape(-1,1))
                 
                 try:

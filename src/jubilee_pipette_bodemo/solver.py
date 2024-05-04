@@ -8,12 +8,13 @@ from botorch.acquisition.analytic import LogExpectedImprovement
 from botorch.models.transforms.outcome import Standardize 
 from botorch.optim import optimize_acqf
 from botorch.utils.transforms import normalize, unnormalize
-from sklearn.gaussian_process import kernels
+
+from gpytorch.kernels import MaternKernel
 
 import torch
 
 from botorch.fit import fit_gpytorch_mll
-from botorch.models import SingleTaskGP
+from botorch.models import SingleTaskGP, FixedNoiseGP
 from gpytorch.mlls import ExactMarginalLogLikelihood
 
 
@@ -83,7 +84,12 @@ class BaysOptimizer():
         return new_x.numpy().squeeze()
 
     def initialize_model(self,x_data, y_data ):
-        kernel = kernels.Matern(nu = self.nu)
+
+
+        x_data = torch.tensor(x_data)
+        y_data = torch.tensor(y_data)
+
+        kernel = MaternKernel(nu = 2.5)
         gp_model = SingleTaskGP(x_data, y_data, outcome_transform=Standardize(m=1), covar_module=kernel).to(x_data)
 
         mll = ExactMarginalLogLikelihood(gp_model.likelihood, gp_model)
