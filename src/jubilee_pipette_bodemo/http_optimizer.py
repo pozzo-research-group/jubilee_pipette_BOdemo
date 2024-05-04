@@ -2,7 +2,7 @@ import requests
 
 
 
-class HTTPSolver():
+class HTTPOptimizer():
     """
     Interfaces with a remote bayesian optimization service to ask and update
     """
@@ -24,7 +24,7 @@ class HTTPSolver():
 
     def ask(self):
 
-
+        print('http optimizer is asking service')
         response = requests.post(self.url+'/get_next_trial', json = {'uuid':self.uuid}, timeout=60)
 
         assert response.status_code == 200, f'Error when getting next trial, {response.content}'
@@ -32,6 +32,7 @@ class HTTPSolver():
         next_experiment = response.json()
 
         self.open_trial_index = next_experiment['trial_index']
+        print('new trial index: ', self.open_trial_index)
         params = next_experiment['parameterization']
 
         return list(params.values())

@@ -85,10 +85,13 @@ class BaysOptimizer():
 
     def initialize_model(self,x_data, y_data ):
 
+        if isinstance(x_data, np.ndarray):
+            x_data = torch.tensor(x_data)
+        if isinstance(y_data, np.ndarray):
+            y_data = torch.tensor(y_data)
 
-        x_data = torch.tensor(x_data)
-        y_data = torch.tensor(y_data)
-
+        print('x data shape: ', x_data.shape)
+        print('y data shape :', y_data.shape)
         kernel = MaternKernel(nu = 2.5)
         gp_model = SingleTaskGP(x_data, y_data, outcome_transform=Standardize(m=1), covar_module=kernel).to(x_data)
 

@@ -12,7 +12,7 @@ from colormath.color_conversions import convert_color
 from datetime import date
 #from jubilee_pipette_bodemo.solver import BaysOptimizer
 from jubilee_pipette_bodemo.ax_solver import AxSolver 
-from jubilee_pipette_bodemo.http_solver import HTTPSolver
+from jubilee_pipette_bodemo.http_optimizer import HTTPOptimizer
 from jubilee_pipette_bodemo.solver import BaysOptimizer
 from jubilee_pipette_bodemo import in_silico_mixing
 
@@ -39,7 +39,9 @@ class ColorMatcher:
         self.color_scores = []
         self.images = []
         # Initialize optimizer
-        self.optimizer = BaysOptimizer([(0,1.0)] * self.nstocks, 1, task = 'minimize')
+        #self.optimizer = BaysOptimizer([(0,1.0)] * self.nstocks, 1, task = 'minimize')
+        self.httpoptimizer = True
+        self.optimizer = HTTPOptimizer(total_stocks, n_random_its, n_bo_its, http_url)
         self.model = None
         self.in_silico_mixing = in_silico_mixing
         self.in_silico_colors = in_silico_colors
@@ -205,11 +207,15 @@ class ColorMatcher:
             if not self.in_silico_mixing:
                 print(f'Dispensing into well {well}')
 
-            if len(self.sample_composition) < 10:
-                query_point = self.generate_initial_data(1)
-                print(query_point)
+            if not self.httpoptimizer:
+                if len(self.sample_composition) < 10:
+                    query_point = self.generate_initial_data(1)
+            #    print(query_point)
+                else:
+                    query_point = self.propose_next_sample()
             else:
                 query_point = self.propose_next_sample()
+
 
             print('query point: ', query_point)
             print('type query pt: ', type(query_point))
