@@ -16,7 +16,7 @@ from jubilee_pipette_bodemo.http_optimizer import HTTPOptimizer
 from jubilee_pipette_bodemo.solver import BaysOptimizer
 from jubilee_pipette_bodemo import in_silico_mixing
 import base64
-
+import time
 
 
 
@@ -261,5 +261,8 @@ class ColorMatcher:
                 with open(filename, 'wt') as f:
                     for entry in data_to_save:
                         f.write(json.dumps(entry) + '\n')      
+
+            if self.in_silico_mixing:
+                time.sleep(10)
         
         return 
