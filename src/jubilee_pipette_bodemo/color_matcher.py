@@ -15,6 +15,7 @@ from jubilee_pipette_bodemo.ax_solver import AxSolver
 from jubilee_pipette_bodemo.http_optimizer import HTTPOptimizer
 from jubilee_pipette_bodemo.solver import BaysOptimizer
 from jubilee_pipette_bodemo import in_silico_mixing
+import base64
 
 
 
@@ -237,7 +238,9 @@ class ColorMatcher:
                 ## Update the optimizer with data
                 print('color score: ', self.color_scores)
                 print('type: ', type(self.color_scores))
-                self.optimizer.update(np.array(self.sample_composition), np.array(self.color_scores).reshape(-1,1))
+
+                transmit_image = base64.b64encode(image).decode('ascii')
+                self.optimizer.update(np.array(self.sample_composition), np.array(self.color_scores).reshape(-1,1), extra_data = {'image':transmit_image, 'observed_rgb':observed_RGB})
                 
                 try:
                     self.visualize(fig, ax)

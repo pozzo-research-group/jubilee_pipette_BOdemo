@@ -41,10 +41,10 @@ class HTTPOptimizer():
 
 
 
-    def update(self, x_data, y_data):
+    def update(self, x_data, y_data, extra_data = None):
 
 
-        print('recieved y: ', y_data)
+        #print('recieved y: ', y_data)
 
         data_package = {}
         data_package['uuid'] = self.uuid
@@ -52,8 +52,10 @@ class HTTPOptimizer():
         data_package['metric'] = self.metric
         data_package['mean'] = float(y_data[-1])
         data_package['std'] = 0
+        if extra_data:
+            data_package['extra_data'] = extra_data
 
-        print('update data: ', data_package)
+        #print('update data: ', data_package)
         response = requests.post(self.url + '/complete_trial', json = data_package, timeout = 10)
 
         assert response.status_code == 200, f'Error when updating trial, {response.content}'
