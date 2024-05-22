@@ -34,6 +34,17 @@ def sample_point(jubilee, pipette, Camera, sample_composition: tuple, sample_vol
         volumes = sample_composition
     else:
         print(f'Error: Color composition does not sum to 1 or expected sample volume of {sample_volume}')
+
+    # zero out any volumes less than 3 uL, nothing will get dispensed anyways 
+    raw_volumes = volumes
+    volumes = []
+    for vol in raw_volumes:
+        if vol > 3:
+            volumes.append(vol)
+        else:
+            volumes.append(0)
+        
+    print('corrected volumes: ', volumes)
     
     print('Calculated volumes: ', volumes)
 

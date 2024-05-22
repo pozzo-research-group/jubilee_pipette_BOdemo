@@ -24,7 +24,7 @@ class HTTPOptimizer():
 
     def ask(self):
 
-        print('http optimizer is asking service')
+        print(f'http optimizer is asking service for next trial experiment {self.uuid}')
         response = requests.post(self.url+'/get_next_trial', json = {'uuid':self.uuid}, timeout=60)
 
         assert response.status_code == 200, f'Error when getting next trial, {response.content}'
@@ -45,6 +45,7 @@ class HTTPOptimizer():
 
 
         #print('recieved y: ', y_data)
+        print(f'Updating optimizer for experiment {self.uuid}')
 
         data_package = {}
         data_package['uuid'] = self.uuid

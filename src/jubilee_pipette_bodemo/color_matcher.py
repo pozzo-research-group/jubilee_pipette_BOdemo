@@ -239,8 +239,11 @@ class ColorMatcher:
                 print('color score: ', self.color_scores)
                 print('type: ', type(self.color_scores))
 
+
+                fake_image = in_silico_mixing.synthetic_image(observed_RGB)
+                fake_transmit_image = base64.b64encode(fake_image).decode('ascii')
                 transmit_image = base64.b64encode(image).decode('ascii')
-                self.optimizer.update(np.array(self.sample_composition), np.array(self.color_scores).reshape(-1,1), extra_data = {'image':transmit_image, 'observed_rgb':observed_RGB})
+                self.optimizer.update(np.array(self.sample_composition), np.array(self.color_scores).reshape(-1,1), extra_data = {'image':transmit_image, 'color_swatch':fake_transmit_image, 'observed_rgb':observed_RGB})
                 
                 try:
                     self.visualize(fig, ax)

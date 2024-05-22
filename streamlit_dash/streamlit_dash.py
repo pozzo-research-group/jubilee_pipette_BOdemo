@@ -44,29 +44,37 @@ while True:
     data = data_r.json()
 
     image = data['image']
+    swatch = data['color_swatch']
     
     image_jpeg = base64.b64decode(image.encode('ascii'))
+    swatch = base64.b64decode(swatch.encode('ascii'))
 
     observed_rgb = data['observed_rgb']
 
     with placeholder.container():
 
-        image_fig, chart_fig = st.columns(2)
+        image_fig, color_swatch_fig = st.columns(2)
         chart2_fig, chart3_fig = st.columns(2)
 
-        image_fig.add_rows
+        #image_fig.add_rows
 
         with image_fig:
             st.header('Most recent image')
             st.image(image_jpeg)
 
-        with chart_fig:
+        with color_swatch_fig:
+            st.header('Most recent observed color')
+            st.image(swatch)
+
+
+
+        with chart2_fig:
             st.header('backtesting curve')
 
             
             print('most recent color')
             print(observed_rgb[-1])
-            hex_codes = [convertRGBtoHex(rgb[0], rgb[1], rgb[2]) for rgb in observed_rgb]
+            hex_codes = [convertRGBtoHex(int(rgb[0]), int(rgb[1]), int(rgb[2])) for rgb in observed_rgb]
 
             loss = data['model_prediction']['y_true']
             ind = np.arange(1, len(hex_codes)+1).tolist()
@@ -83,13 +91,13 @@ while True:
             ).encode(
                 x = 'trial_ind',
                 y = 'loss',
-                color = alt.value('color')
+                #color = alt.value('color')
             )
 
             st.altair_chart(backtest_curve)
 
 
-        with chart2_fig:
+        with chart3_fig:
             st.header('GPR Model parity plot')
             y_pred = data['model_prediction']['y_pred']
             y_true = data['model_prediction']['y_true']
@@ -107,9 +115,6 @@ while True:
             )
 
             st.altair_chart(alt_chart)
-
-        with chart3_fig:
-            st.header('Held for future use')
 
 
     time.sleep(10)
