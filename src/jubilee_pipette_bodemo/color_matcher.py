@@ -12,10 +12,11 @@ from colormath.color_conversions import convert_color
 from datetime import date
 #from jubilee_pipette_bodemo.solver import BaysOptimizer
 from jubilee_pipette_bodemo.ax_solver import AxSolver 
-from jubilee_pipette_bodemo.http_solver import HTTPSolver
+from jubilee_pipette_bodemo.http_optimizer import HTTPOptimizer
 from jubilee_pipette_bodemo.solver import BaysOptimizer
 from jubilee_pipette_bodemo import in_silico_mixing
-
+import base64
+import time
 
 
 
@@ -39,7 +40,9 @@ class ColorMatcher:
         self.color_scores = []
         self.images = []
         # Initialize optimizer
-        self.optimizer = BaysOptimizer([(0,1.0)] * self.nstocks, 1, task = 'minimize')
+        #self.optimizer = BaysOptimizer([(0,1.0)] * self.nstocks, 1, task = 'minimize')
+        self.httpoptimizer = True
+        self.optimizer = HTTPOptimizer(total_stocks, n_random_its, n_bo_its, http_url)
         self.model = None
         self.in_silico_mixing = in_silico_mixing
         self.in_silico_colors = in_silico_colors
@@ -205,11 +208,15 @@ class ColorMatcher:
             if not self.in_silico_mixing:
                 print(f'Dispensing into well {well}')
 
-            if len(self.sample_composition) < 10:
-                query_point = self.generate_initial_data(1)
-                print(query_point)
+            if not self.httpoptimizer:
+                if len(self.sample_composition) < 10:
+                    query_point = self.generate_initial_data(1)
+            #    print(query_point)
+                else:
+                    query_point = self.propose_next_sample()
             else:
                 query_point = self.propose_next_sample()
+
 
             print('query point: ', query_point)
             print('type query pt: ', type(query_point))
@@ -231,7 +238,12 @@ class ColorMatcher:
                 ## Update the optimizer with data
                 print('color score: ', self.color_scores)
                 print('type: ', type(self.color_scores))
-                self.optimizer.update(np.array(self.sample_composition), np.array(self.color_scores).reshape(-1,1))
+
+
+                fake_image = in_silico_mixing.synthetic_image(observed_RGB)
+                fake_transmit_image = base64.b64encode(fake_image).decode('ascii')
+                transmit_image = base64.b64encode(image).decode('ascii')
+                self.optimizer.update(np.array(self.sample_composition), np.array(self.color_scores).reshape(-1,1), extra_data = {'image':transmit_image, 'color_swatch':fake_transmit_image, 'observed_rgb':observed_RGB})
                 
                 try:
                     self.visualize(fig, ax)
@@ -252,5 +264,8 @@ class ColorMatcher:
                 with open(filename, 'wt') as f:
                     for entry in data_to_save:
                         f.write(json.dumps(entry) + '\n')      
+
+            if self.in_silico_mixing:
+                time.sleep(10)
         
         return 
