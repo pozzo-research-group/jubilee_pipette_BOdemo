@@ -9,8 +9,8 @@ import numpy as np
 from utils import convertRGBtoHex
 
 
-data_url = 'http://localhost:5000/observability_data'
-uuid_url = 'http://localhost:5000/get_open_experiment'
+data_url = 'http://127.0.0.1:5000/observability_data'
+uuid_url = 'http://127.0.0.1:5000/get_open_experiment'
 
 
 st.set_page_config(

@@ -1,9 +1,6 @@
 streamlit
 streamlit-autorefresh
 matplotlib
-io
 torch
-cv2
-bo-serving
 
 

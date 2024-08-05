@@ -9,7 +9,7 @@ def process_image(image_bin):
     """
     image_arr = np.frombuffer(image_bin, np.uint8)
     image = cv2.imdecode(image_arr, cv2.IMREAD_COLOR)
-    radius = 30
+    radius = 20
     masked_image = _mask_image(image, radius)
     values = _get_rgb_avg(masked_image)
     return values
