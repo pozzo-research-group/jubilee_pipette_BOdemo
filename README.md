@@ -54,3 +54,58 @@ Functions to process the captured images and return an RGB value are in the `ima
 
 As mentioned above, there are a few options for Bayesian optimization implementations. The default is to use an optimizer implemented as an HTTP endpoint. You also have the option of using a basic optimizer implemented in [Ax](https://ax.dev/) or custom BO implementation in BoTorch. Unfortunately, the choice of optimizer is currently hard-coded in the ColorMatcher constructor function. To change it, change the line `self.optimizer = ...` in the ColorMatcher constructor to your choice of `AxSolver` (implemented in `ax_solver.py`) or `BaysOptimizer` (implemented in `solver.py`). You will also need to change the arguments to the optimizer constructor as well. 
 
+## Notes for WIP
+
+These are live notes for myself as I update the branch, this is a work in progress and these notes will be used to rewrite the readme
+
+The following should be listed as dependencies
+ - pip install colormath
+ - pip install pymixbox
+
+### The following are live notes on what needs to be changed or updated
+Small changes
+ - numpy version mismatch(?) opencv requires numpy 2.2.6 but most recent version is 2.3.3
+
+Bigger changes
+- Error with ax-plateform, source is version mismatch with repo (ax-platform requires python 3.10 or higher as of 10/3/25 https://github.com/facebook/Ax)
+
+```
+---------------------------------------------------------------------------
+ModuleNotFoundError                       Traceback (most recent call last)
+Cell In[2], line 6
+      3 from science_jubilee.tools import Pipette, WebCamera
+      5 # --------- Color Matching Demo -----------
+----> 6 from jubilee_pipette_bodemo.color_matcher import ColorMatcher
+      8 # ------ Data visualization outside of the notebook ------
+      9 import matplotlib
+
+File ~/colormatch/jubilee_pipette_BOdemo/src/jubilee_pipette_bodemo/color_matcher.py:14
+     12 from datetime import date
+     13 #from jubilee_pipette_bodemo.solver import BaysOptimizer
+---> 14 from jubilee_pipette_bodemo.ax_solver import AxSolver 
+     15 from jubilee_pipette_bodemo.http_optimizer import HTTPOptimizer
+     16 from jubilee_pipette_bodemo.solver import BaysOptimizer
+
+File ~/colormatch/jubilee_pipette_BOdemo/src/jubilee_pipette_bodemo/ax_solver.py:1
+----> 1 from ax.modelbridge.dispatch_utils import choose_generation_strategy
+      2 from ax.modelbridge.generation_strategy import GenerationStep, GenerationStrategy
+      3 from ax.modelbridge.modelbridge_utils import get_pending_observation_features
+
+ModuleNotFoundError: No module named 'ax.modelbridge'
+
+```
+
+- Error with FixedNoiseGP in botorch_optimizer.py (deleted FixedNoiseGP from line 17
+```
+from botorch.models import SingleTaskGP, FixedNoiseGP
+```
+changed to 
+```
+from botorch.models import SingleTaskGP
+```
+- NOTE: mixbox is not installed with pip install mixbox, it is with pip install pymixbox
+- It seems like the color mix is a little weird, I'm working on writing a new colormixing function without colormix
+- Commented out line 7, streamlit_dash.py "from streamlit_autorefresh import st_autorefresh"
+- Include links to docs for creating lab deck (https://machineagency.github.io/science-jubilee/getting_started/deck_guide.html#deck-guide)
+- Can't find guide or notebook to create calibrated lab deck (using old file)
+- Explain that in the jupyter notebook that UR, UL, and BR are upper right, upper left, and bottom right
