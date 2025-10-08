@@ -109,3 +109,6 @@ from botorch.models import SingleTaskGP
 - Include links to docs for creating lab deck (https://machineagency.github.io/science-jubilee/getting_started/deck_guide.html#deck-guide)
 - Can't find guide or notebook to create calibrated lab deck (using old file)
 - Explain that in the jupyter notebook that UR, UL, and BR are upper right, upper left, and bottom right
+- Include link in the jupyter notebook to Jubilee docs on measuring the manual offsets for labware (https://science-jubilee.readthedocs.io/en/latest/getting_started/deck_guide.html#deck-guide)
+- Include the manual offsets for the stock solutions as well as the samples and the tip rack
+-  There are issues/considerations that need to be addressed with setting up the webcamera. it isn't clear how to set the collision/picture up. -- There is an error in machine agency's code when calculating the height of the picture. A change was made where the focus height was added to the clearance height of the sample labware rather than subtract the absolute value of the tool offset from the focus height which makes less sense.
